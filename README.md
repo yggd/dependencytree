@@ -1,0 +1,3 @@
+## To enable control of Maven's dependent libraries from Java (Kotlin)
+
+* TBD: Usage, assertion, customization, build environment, etc...
