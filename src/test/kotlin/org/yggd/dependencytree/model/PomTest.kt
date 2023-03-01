@@ -12,7 +12,7 @@ class PomTest {
 
     @Test
     fun pomTest() {
-        val pomFile = File("/Users/mbp1/IdeaProjects/terabatch541/pom.xml")
+        val pomFile = File("testpom/terabatch541.xml")
         val pom = Pom.fromFile(pomFile)
         assertThat(pom.artifactId).isEqualTo("terabatch541")
 
