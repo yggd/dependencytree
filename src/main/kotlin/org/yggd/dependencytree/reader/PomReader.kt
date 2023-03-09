@@ -15,7 +15,6 @@ import java.nio.file.Paths
 sealed interface PomReader {
 
     fun read(groupId: String, artifactId: String, version: String) : InputStream?
-
     fun replacedGroupId(groupId: String) = groupId.replace(".", File.separator)
     fun pomFileName(artifactId: String, version: String) = "${artifactId}-${version}.pom"
 }
@@ -72,7 +71,7 @@ private class RemoteRepositoryPomReader(
             url = "${url}/"
         }
 
-        val replacedGroupId = replacedGroupId(groupId)
+        val replacedGroupId = groupId.replace(".", "/")
         val pomFileName = pomFileName(artifactId, version)
 
         url = "${url}${replacedGroupId}/${artifactId}/${version}/${pomFileName}"
@@ -90,5 +89,4 @@ private class RemoteRepositoryPomReader(
             }
         }
     }
-
 }
