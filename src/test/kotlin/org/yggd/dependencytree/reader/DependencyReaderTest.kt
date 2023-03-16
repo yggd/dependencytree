@@ -4,13 +4,17 @@ import org.junit.jupiter.api.Test
 
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.tuple
+import org.yggd.dependencytree.model.ActiveProfile
 import java.io.File
 
 class DependencyReaderTest {
 
     @Test
     fun rootDependencies() {
-        val dependencyReader = DependencyReader("11")
+        val profile = ActiveProfile.Builder()
+            .jdk("11")
+            .build()
+        val dependencyReader = DependencyReader(profile)
         val dependencies = dependencyReader.transitDependency(File("testpom/terabatch541.xml"))
 
         assertThat(dependencies)
@@ -90,7 +94,10 @@ class DependencyReaderTest {
 
     @Test
     fun flattenSingleModule() {
-        val dependencyReaderJdk8 = DependencyReader("1.8")
+        val profile = ActiveProfile.Builder()
+            .jdk("1.8")
+            .build()
+        val dependencyReaderJdk8 = DependencyReader(profile)
         var flatten = dependencyReaderJdk8.flatten(File("testpom/terabatch541.xml"))
         assertThat(flatten)
             .hasSize(37)
@@ -135,7 +142,10 @@ class DependencyReaderTest {
                 tuple("org.checkerframework","checker-qual","jar","3.5.0","runtime")
             )
 
-        val dependencyReaderJdk11 = DependencyReader("11")
+        val profileJdk11 = ActiveProfile.Builder()
+            .jdk("11")
+            .build()
+        val dependencyReaderJdk11 = DependencyReader(profileJdk11)
         flatten = dependencyReaderJdk11.flatten(File("testpom/terabatch541.xml"))
         assertThat(flatten)
             .hasSize(38)
@@ -180,7 +190,10 @@ class DependencyReaderTest {
                 tuple("org.postgresql","postgresql","jar","42.3.1","runtime"),
                 tuple("org.checkerframework","checker-qual","jar","3.5.0","runtime"))
 
-        val dependencyReaderJdk17 = DependencyReader("17")
+        val profileJdk17 = ActiveProfile.Builder()
+            .jdk("17")
+            .build()
+        val dependencyReaderJdk17 = DependencyReader(profileJdk17)
         flatten = dependencyReaderJdk17.flatten(File("testpom/terabatch541.xml"))
         assertThat(flatten)
             .hasSize(38)
@@ -229,7 +242,10 @@ class DependencyReaderTest {
 
     @Test
     fun flattenMultiModule() {
-        val dependencyReader = DependencyReader("1.8")
+        val profile = ActiveProfile.Builder()
+            .jdk("1.8")
+            .build()
+        val dependencyReader = DependencyReader(profile)
         val modules = dependencyReader.flattenMultiModule(File("testPom/teraserver571sp1.xml"))
         assertThat(modules)
             .hasSize(5)
@@ -564,5 +580,29 @@ class DependencyReaderTest {
                 tuple("org.apache.tomcat.embed","tomcat-embed-el","jar","9.0.55","test"),
                 tuple("com.example.todo","todo-env","jar","1.0.0-SNAPSHOT","compile"),
                 tuple("com.h2database","h2","jar","1.4.200","runtime"))
+    }
+
+    @Test
+    fun confirmProfile() {
+        val profileDefault = ActiveProfile.Builder().jdk("1.8").build()
+        val flattenDefault = DependencyReader(profileDefault)
+            .flattenMultiModule(File("testpom/teraserver571sp1.xml"))["todo-web"]
+
+        val h2 = tuple("com.h2database", "h2", "jar", "1.4.200", "runtime")
+
+        assertThat(flattenDefault)
+            .extracting("groupId", "artifactId", "type", "version", "scope")
+            .contains(h2)
+
+        val profileWarpackWithEnv = ActiveProfile.Builder().jdk("1.8").profile("warpack-with-env").build()
+        val flattenWarpackWithEnv = DependencyReader(profileWarpackWithEnv)
+            .flattenMultiModule(File("testpom/teraserver571sp1.xml"))["todo-web"]
+
+        assertThat(flattenDefault)
+            .containsAll(flattenWarpackWithEnv)
+
+        assertThat(flattenWarpackWithEnv)
+            .extracting("groupId", "artifactId", "type", "version", "scope")
+            .doesNotContain(h2)
     }
 }

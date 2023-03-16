@@ -5,11 +5,11 @@ import org.apache.maven.artifact.versioning.VersionRange
 import org.apache.maven.model.*
 import java.util.*
 
-class ModelWrapper(private val delegate: Model, private val jdk: String, private val parentModel: Model? = null) : Model() {
+class ModelWrapper(private val delegate: Model,
+                   private val profile: ActiveProfile,
+                   private val parentModel: Model? = null) : Model() {
 
-    val delegationProfiles : List<Profile> = delegationProfiles(join(parentModel?.profiles, delegate.profiles))
-
-    private fun delegationProfiles(profiles: List<Profile>) = profiles.filter { p -> isActive(p.activation) }
+    private val delegationProfiles : List<Profile> = join(parentModel?.profiles, delegate.profiles).filter { p -> isActive(p) }
 
     private fun join(prof1: List<Profile?>?, prof2: List<Profile?>): List<Profile> {
         val profiles = mutableListOf<Profile>()
@@ -28,16 +28,14 @@ class ModelWrapper(private val delegate: Model, private val jdk: String, private
         return profiles
     }
 
-    private fun isActive(activation: Activation?) : Boolean {
-        if (activation == null) {
-            return false
-        }
-        // TODO always activate when activeByDefault is true.
-        if (activation.isActiveByDefault) {
+    private fun isActive(pomProfile: Profile) : Boolean {
+        if (pomProfile.activation?.isActiveByDefault == true && profile.default()) {
             return true
         }
-        // TODO Only evaluation of JDK version range.
-        var jdkRange = activation.jdk ?: return false
+        if (profile.profileNames.contains(pomProfile.id)) {
+            return true
+        }
+        var jdkRange = pomProfile.activation?.jdk ?: return false
         if (jdkRange.endsWith(",")) {
             // To avoid InvalidVersionSpecificationException: Unbounded range: [9,
             jdkRange = "${jdkRange})"
@@ -50,9 +48,9 @@ class ModelWrapper(private val delegate: Model, private val jdk: String, private
         return contains
     }
 
-    private fun actualJdk() = when (jdk) {
+    private fun actualJdk() = when (profile.jdk) {
         "8" -> "1.8"
-        else -> jdk
+        else -> profile.jdk
     }
 
     override fun getDependencies(): MutableList<Dependency> {
@@ -152,7 +150,7 @@ class ModelWrapper(private val delegate: Model, private val jdk: String, private
         other as ModelWrapper
 
         if (delegate != other.delegate) return false
-        if (jdk != other.jdk) return false
+        if (profile  != other.profile) return false
         if (delegationProfiles != other.delegationProfiles) return false
 
         return true
@@ -160,7 +158,7 @@ class ModelWrapper(private val delegate: Model, private val jdk: String, private
 
     override fun hashCode(): Int {
         var result = delegate.hashCode()
-        result = 31 * result + jdk.hashCode()
+        result = 31 * result + profile.hashCode()
         result = 31 * result + (delegationProfiles.hashCode())
         return result
     }
@@ -171,7 +169,7 @@ class ModelWrapper(private val delegate: Model, private val jdk: String, private
 }
 
 class DependencyManagementWrapper(private val dm: List<DependencyManagement>) : DependencyManagement() {
-    override fun getDependencies(): MutableList<Dependency>? {
+    override fun getDependencies(): MutableList<Dependency> {
         return dm.flatMap { d -> d.dependencies }.toMutableList()
     }
 }

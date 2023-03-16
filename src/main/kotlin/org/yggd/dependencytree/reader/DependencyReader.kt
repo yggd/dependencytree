@@ -5,6 +5,7 @@ import org.apache.maven.model.Exclusion
 import org.apache.maven.model.Model
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader
 import org.slf4j.LoggerFactory
+import org.yggd.dependencytree.model.ActiveProfile
 import org.yggd.dependencytree.model.EffectiveDependency
 import org.yggd.dependencytree.model.EffectiveExclusion
 import org.yggd.dependencytree.model.ModelWrapper
@@ -13,19 +14,30 @@ import java.io.FileInputStream
 import java.io.InputStream
 import java.lang.IllegalStateException
 
-// TODO Profile settings.
-class DependencyReader(private val jdk: String) {
+/**
+ * resolve dependency tree.
+ */
+class DependencyReader(private val profile: ActiveProfile) {
 
     companion object {
         private val logger = LoggerFactory.getLogger(DependencyReader::class.java)
     }
 
-    constructor() : this(System.getProperty("java.specification.version"))
+    /**
+     * default constructor.
+     * JDK profile as system property: "java.specification.version"
+     */
+    constructor() : this(ActiveProfile.Builder().build())
 
     private val pomReader = CompositePomReader()
 
     private val modelCache = mutableMapOf<Triple<String, String, String>, Model>()
 
+    /**
+     * transit dependencies from POM file.
+     * @param file POM file
+     * @return dependency set
+     */
     fun transitDependency(file: File) : Set<EffectiveDependency> {
         return transitDependency(FileInputStream(file))
     }
@@ -103,7 +115,7 @@ class DependencyReader(private val jdk: String) {
 
     private fun model(groupId: String, artifactId: String, version: String) =
         modelCache.computeIfAbsent(Triple(groupId, artifactId, version)) { t ->
-            ModelWrapper(MavenXpp3Reader().read(pomReader.read(t.first, t.second, t.third)), jdk)
+            ModelWrapper(MavenXpp3Reader().read(pomReader.read(t.first, t.second, t.third)), profile)
         }
 
     internal fun modularModel(file: File) : Map<String,Model> {
@@ -111,7 +123,7 @@ class DependencyReader(private val jdk: String) {
             MavenXpp3Reader().read(stream)
         }
         if (rawModel.modules == null || rawModel.modules?.isEmpty() == true) {
-            val model = ModelWrapper(rawModel, jdk)
+            val model = ModelWrapper(rawModel, profile)
             modelCache.putIfAbsent(Triple(rawModel.groupId, rawModel.artifactId, rawModel.version), model)
             return mapOf(rawModel.artifactId to model)
         }
@@ -125,7 +137,7 @@ class DependencyReader(private val jdk: String) {
                 readable
             }.associate { m ->
                 m.first to FileInputStream(m.second).use { stream ->
-                    val model = ModelWrapper(MavenXpp3Reader().read(stream), jdk, rawModel)
+                    val model = ModelWrapper(MavenXpp3Reader().read(stream), profile, rawModel)
                     modelCache.putIfAbsent(Triple(model.groupId, model.artifactId, model.version), model)
                     model
                 }
@@ -133,7 +145,7 @@ class DependencyReader(private val jdk: String) {
     }
 
     private fun model(inputStream: InputStream) : Model {
-        val model = inputStream.use { ModelWrapper(MavenXpp3Reader().read(it), jdk) }
+        val model = inputStream.use { ModelWrapper(MavenXpp3Reader().read(it), profile) }
         modelCache.putIfAbsent(Triple(model.groupId, model.artifactId, model.version), model)
         return model
     }
